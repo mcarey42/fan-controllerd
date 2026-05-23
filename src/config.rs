@@ -59,6 +59,11 @@ pub struct SlewConfig {
     pub min_duty: u8,
     #[serde(default = "default_max_duty")]
     pub max_duty: u8,
+    /// Suppress duty writes smaller than this many percentage points. Swallows
+    /// the typical 1°C temperature jitter that translates into 1% duty wobble.
+    /// 0 disables the deadband (every change is written).
+    #[serde(default = "default_deadband")]
+    pub deadband_pct: u8,
 }
 
 fn default_rise() -> u8 {
@@ -73,6 +78,9 @@ fn default_min_duty() -> u8 {
 fn default_max_duty() -> u8 {
     100
 }
+fn default_deadband() -> u8 {
+    2
+}
 
 impl Default for SlewConfig {
     fn default() -> Self {
@@ -81,6 +89,7 @@ impl Default for SlewConfig {
             max_fall_per_tick: default_fall(),
             min_duty: default_min_duty(),
             max_duty: default_max_duty(),
+            deadband_pct: default_deadband(),
         }
     }
 }

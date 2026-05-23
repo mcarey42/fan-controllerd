@@ -18,6 +18,7 @@ max_rise_per_tick = 10       # ramp up fast on load spike
 max_fall_per_tick = 3        # come down slowly to avoid hunting
 min_duty = 20                # quiet floor — never go below this
 max_duty = 100
+deadband_pct = 2             # swallow sub-band wobble; 0 disables, write every change
 
 [ipmi]
 # Local in-band only — no fields needed.

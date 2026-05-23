@@ -88,6 +88,17 @@ pub fn slew_limit(current: u8, target: u8, slew: &SlewConfig) -> u8 {
     next.clamp(slew.min_duty, slew.max_duty)
 }
 
+/// Suppress a duty change that's smaller than `deadband_pct`. Returns the
+/// previous `current` when the proposed `target` is within the band, so the
+/// caller skips the IPMI write. `deadband_pct = 0` disables suppression.
+/// First tick (`current = None`) always passes through.
+pub fn apply_deadband(current: Option<u8>, target: u8, deadband_pct: u8) -> u8 {
+    match current {
+        Some(curr) if target.abs_diff(curr) < deadband_pct => curr,
+        _ => target,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,6 +122,7 @@ mod tests {
             max_fall_per_tick: 3,
             min_duty: 20,
             max_duty: 100,
+            deadband_pct: 0, // existing tests assume no deadband suppression
         }
     }
 
@@ -272,5 +284,40 @@ mod tests {
         slew.max_duty = 90;
         // current 85, target 100 — rise capped to +10 = 95; clamped to 90
         assert_eq!(slew_limit(85, 100, &slew), 90);
+    }
+
+    // --- apply_deadband ---
+
+    #[test]
+    fn deadband_first_tick_passes_through() {
+        // No prior duty — write the target whatever the band.
+        assert_eq!(apply_deadband(None, 25, 2), 25);
+        assert_eq!(apply_deadband(None, 100, 50), 100);
+    }
+
+    #[test]
+    fn deadband_suppresses_changes_inside_band() {
+        // diff 1 < band 2 → hold previous
+        assert_eq!(apply_deadband(Some(28), 29, 2), 28);
+        assert_eq!(apply_deadband(Some(28), 27, 2), 28);
+    }
+
+    #[test]
+    fn deadband_allows_changes_at_or_above_band() {
+        // diff 2 >= band 2 → pass
+        assert_eq!(apply_deadband(Some(28), 30, 2), 30);
+        assert_eq!(apply_deadband(Some(28), 26, 2), 26);
+    }
+
+    #[test]
+    fn deadband_zero_disables_suppression() {
+        // Every change goes through.
+        assert_eq!(apply_deadband(Some(28), 29, 0), 29);
+        assert_eq!(apply_deadband(Some(28), 28, 0), 28);
+    }
+
+    #[test]
+    fn deadband_no_change_returns_current() {
+        assert_eq!(apply_deadband(Some(28), 28, 2), 28);
     }
 }

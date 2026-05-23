@@ -147,6 +147,10 @@ annotated default config.
   the daemon would trip out before the curve ever asks for max duty).
 - `min_duty` is your quiet floor. 20% is silent on R730xd. Drop to 15 if you
   want quieter and have good airflow.
+- `deadband_pct` swallows duty changes smaller than the band — typically the
+  1°C CPU jitter that translates into 1% duty wobble. Default is 2. Set to
+  0 to write every change (useful when debugging the curve), or raise it if
+  your CPU temps are particularly noisy.
 
 ### Sensor discovery
 

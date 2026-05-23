@@ -10,7 +10,9 @@ use sd_notify::NotifyState;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use fan_controllerd::config::Config;
-use fan_controllerd::control::{demand_for_sensor, inlet_bias_pct, merge_demands, slew_limit};
+use fan_controllerd::control::{
+    apply_deadband, demand_for_sensor, inlet_bias_pct, merge_demands, slew_limit,
+};
 use fan_controllerd::ipmi_fan::IpmiFan;
 use fan_controllerd::safety::{install_signal_handlers, sleep_interruptible, BmcGuard};
 use fan_controllerd::sensors::{self, ipmi::IpmiCache};
@@ -170,10 +172,14 @@ fn run_loop(cfg: &Config, guard: &BmcGuard, stop: &Arc<AtomicBool>, once: bool) 
 
         // 5. Slew-limit toward target (first tick has no "current", so we
         //    write the target directly — no need to ease in from unknown).
-        let new_duty = match current_duty {
+        let slewed = match current_duty {
             None => target,
             Some(curr) => slew_limit(curr, target, &cfg.slew),
         };
+
+        // 5a. Deadband: if the slew-limited proposal is within deadband_pct
+        //     of the current duty, hold steady. Suppresses 1°C jitter chatter.
+        let new_duty = apply_deadband(current_duty, slewed, cfg.slew.deadband_pct);
 
         // 6. Write if changed, or if heartbeat is due.
         let changed = current_duty != Some(new_duty);

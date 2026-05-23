@@ -1,6 +1,6 @@
 [package]
 name = "fan-controllerd"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Dynamic fan controller daemon for Dell R630/R730 servers via IPMI"
 license = "MIT"
