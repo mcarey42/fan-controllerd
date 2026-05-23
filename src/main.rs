@@ -187,8 +187,11 @@ fn run_loop(cfg: &Config, guard: &BmcGuard, stop: &Arc<AtomicBool>, once: bool) 
         if changed || heartbeat_due {
             match guard.fan().set_duty(new_duty) {
                 Ok(()) => {
+                    // DEBUG (not INFO) because per-tick duty changes are
+                    // chatty on a healthy idle box. Enable with RUST_LOG=debug
+                    // when investigating curve tuning — see README.
                     if changed {
-                        tracing::info!(
+                        tracing::debug!(
                             duty = new_duty,
                             target = target,
                             inlet_bias = bias,

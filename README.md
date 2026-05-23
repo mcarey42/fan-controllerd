@@ -178,6 +178,43 @@ A single `[[sensor]]` entry can yield multiple physical readings — for
 example, `chip = "nvme", label = "Composite"` matches all NVMe drives in the
 system. The hottest reading drives that sensor's curve.
 
+## Debugging
+
+The daemon defaults to **INFO** logging — startup, shutdown, IPMI errors,
+ceiling trips. Per-tick duty changes are at **DEBUG** so they don't fill
+your journal during steady-state operation.
+
+To see what the curve is doing each tick — sensor readings, computed
+demands, slew-limited duty, deadband suppressions — enable DEBUG:
+
+```sh
+# Persistent: drop-in unit override.
+sudo systemctl edit fan-controllerd
+# Paste into the editor that opens:
+#   [Service]
+#   Environment=RUST_LOG=debug
+# Save and exit, then:
+sudo systemctl restart fan-controllerd
+
+# Watch it live:
+journalctl -fu fan-controllerd
+```
+
+To revert, run `systemctl edit fan-controllerd` again and remove the
+`Environment=` line (or delete `/etc/systemd/system/fan-controllerd.service.d/override.conf`),
+then `systemctl restart fan-controllerd`.
+
+For a one-off CLI run without touching the unit:
+
+```sh
+sudo systemctl stop fan-controllerd
+sudo RUST_LOG=debug fan-controllerd --config /etc/fan-controllerd/config.toml
+# Ctrl-C to stop; BMC auto restored on exit. Then systemctl start to resume.
+```
+
+`RUST_LOG` accepts the [tracing env-filter syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
+— e.g. `RUST_LOG=fan_controllerd=debug,warn` to keep external crates quiet.
+
 ## Build from source
 
 Needs Rust 1.70+ and (for `.deb`) `cargo-deb`.

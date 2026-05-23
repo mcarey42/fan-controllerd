@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-05-22
+
+### Changed
+- Per-tick duty-change log lines demoted from INFO to DEBUG. Keeps the
+  default journal output focused on lifecycle events (startup, shutdown,
+  errors, ceiling trips). Enable with `RUST_LOG=debug` — see the new
+  "Debugging" section in the README.
+
 ## [0.1.1] — 2026-05-22
 
 ### Added
