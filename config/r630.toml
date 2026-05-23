@@ -1,0 +1,62 @@
+# fan-controllerd configuration — Dell PowerEdge R630
+#
+# Auto-selected at install when dmidecode reports a PowerEdge R630.
+# Aggressive 15% floor — R630 BMC honors this, tested on hardware with
+# dual E5-2650v4 + 4 NVMes (nightlight). R630 chassis is 1U with 7 fans,
+# typically idles around 5,000 RPM under BMC auto; this config drops it
+# to ~4,400 RPM at quiet idle while still ramping cleanly under load.
+
+tick_seconds = 5
+write_heartbeat_ticks = 12
+
+[slew]
+max_rise_per_tick = 10
+max_fall_per_tick = 3
+min_duty = 15
+max_duty = 100
+deadband_pct = 2
+
+[ipmi]
+
+[inlet_bias]
+sensor = "Inlet Temp"
+threshold_c = 27.0
+percent_per_degree_above = 2.0
+max_bias_pct = 30
+
+# ---- CPU package sensors ----
+
+[[sensor]]
+name = "cpu-pkg-0"
+source = "hwmon"
+chip = "coretemp"
+label = "Package id 0"
+hard_ceiling_c = 90.0
+curve = [[40, 15], [55, 25], [65, 35], [75, 55], [85, 90]]
+
+[[sensor]]
+name = "cpu-pkg-1"
+source = "hwmon"
+chip = "coretemp"
+label = "Package id 1"
+hard_ceiling_c = 90.0
+curve = [[40, 15], [55, 25], [65, 35], [75, 55], [85, 90]]
+
+# ---- NVMe drives (matches all NVMe Composite sensors) ----
+
+[[sensor]]
+name = "nvme"
+source = "hwmon"
+chip = "nvme"
+label = "Composite"
+hard_ceiling_c = 75.0
+curve = [[45, 15], [60, 30], [70, 60], [74, 90]]
+
+# ---- IPMI exhaust ----
+
+[[sensor]]
+name = "exhaust"
+source = "ipmi"
+sensor = "Exhaust Temp"
+hard_ceiling_c = 75.0
+curve = [[40, 15], [50, 30], [60, 50], [70, 80]]

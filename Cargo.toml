@@ -1,6 +1,6 @@
 [package]
 name = "fan-controllerd"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 description = "Dynamic fan controller daemon for Dell R630/R730 servers via IPMI"
 license = "MIT"
@@ -38,14 +38,19 @@ fan-controllerd dynamically controls Dell R630/R730 chassis fans via IPMI \
 based on CPU package, NVMe, and IPMI exhaust/inlet temperatures. \
 Uses a piecewise-linear curve per sensor with slew-rate limiting, and \
 restores BMC automatic fan control on any exit as a safety guard."""
-depends = "$auto, ipmitool"
+depends = "$auto, ipmitool, dmidecode"
 section = "admin"
 priority = "optional"
+# /etc/fan-controllerd/config.toml is NOT shipped in the package starting in
+# v0.2.0 — postinst creates it from a per-hardware template. Upgrading from
+# v0.1.x: dpkg sees the conffile is gone from the new package and leaves the
+# user's existing file in place (Debian policy 10.7.3).
 assets = [
   ["target/release/fan-controllerd", "usr/sbin/", "755"],
-  ["config/config.toml.example", "etc/fan-controllerd/config.toml", "644"],
+  ["config/r630.toml", "usr/share/fan-controllerd/configs/", "644"],
+  ["config/r730.toml", "usr/share/fan-controllerd/configs/", "644"],
+  ["config/default.toml", "usr/share/fan-controllerd/configs/", "644"],
   ["systemd/fan-controllerd.service", "lib/systemd/system/", "644"],
   ["LICENSE", "usr/share/doc/fan-controllerd/", "644"],
 ]
-conf-files = ["/etc/fan-controllerd/config.toml"]
 maintainer-scripts = "debian/"

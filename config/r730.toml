@@ -1,4 +1,8 @@
-# fan-controllerd configuration — Dell R730xd defaults
+# fan-controllerd configuration — Dell PowerEdge R730 / R730xd
+#
+# Auto-selected at install when dmidecode reports a PowerEdge R730 family.
+# Conservative 20% floor — known good on R730xd (proxmox-core). Lower at
+# your own risk; some R730 BMC firmware clamps below ~15%.
 #
 # How it works:
 #   1. Each tick (default 5s), every sensor's curve is interpolated to a

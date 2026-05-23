@@ -1,0 +1,78 @@
+# fan-controllerd configuration — GENERIC FALLBACK
+#
+# !!!  This config was installed because dmidecode did not recognize  !!!
+# !!!  your hardware as a Dell PowerEdge R630 or R730 family server.  !!!
+# !!!  REVIEW THIS FILE BEFORE STARTING THE SERVICE.                  !!!
+#
+# The bundled tuned configs cover R630 and R730/R730xd. Other Dell
+# 13G-generation servers (R430, R530, R730xd, T630, T430) very likely
+# work with similar settings since they share the BMC and IPMI raw
+# command set, but have not been verified.
+#
+# Pre-flight checklist:
+#   1. Verify the [[sensor]] blocks below match your hardware:
+#        for h in /sys/class/hwmon/hwmon*; do
+#          echo "--- $(cat $h/name) ---"
+#          for f in $h/temp*_input; do
+#            lbl=${f%_input}_label
+#            [ -r $lbl ] && printf "  %s\n" "$(cat $lbl)"
+#          done
+#        done
+#        ipmitool sdr type temperature
+#   2. Run `fan-controllerd --check` to validate the file parses.
+#   3. Run `fan-controllerd --dry-run --once` to confirm sensor reads
+#      work without engaging fan control.
+#   4. Only then: `systemctl enable --now fan-controllerd`.
+#
+# This config uses the R730 floor (20%) as the safest starting point.
+# Tune downward (see README "Curve tuning") only after confirming your
+# BMC honors lower duties via `ipmitool raw 0x30 0x30 0x02 0xff 0x0f`.
+
+tick_seconds = 5
+write_heartbeat_ticks = 12
+
+[slew]
+max_rise_per_tick = 10
+max_fall_per_tick = 3
+min_duty = 20
+max_duty = 100
+deadband_pct = 2
+
+[ipmi]
+
+[inlet_bias]
+sensor = "Inlet Temp"
+threshold_c = 27.0
+percent_per_degree_above = 2.0
+max_bias_pct = 30
+
+[[sensor]]
+name = "cpu-pkg-0"
+source = "hwmon"
+chip = "coretemp"
+label = "Package id 0"
+hard_ceiling_c = 90.0
+curve = [[40, 20], [55, 25], [65, 35], [75, 55], [85, 90]]
+
+[[sensor]]
+name = "cpu-pkg-1"
+source = "hwmon"
+chip = "coretemp"
+label = "Package id 1"
+hard_ceiling_c = 90.0
+curve = [[40, 20], [55, 25], [65, 35], [75, 55], [85, 90]]
+
+[[sensor]]
+name = "nvme"
+source = "hwmon"
+chip = "nvme"
+label = "Composite"
+hard_ceiling_c = 75.0
+curve = [[45, 20], [60, 30], [70, 60], [74, 90]]
+
+[[sensor]]
+name = "exhaust"
+source = "ipmi"
+sensor = "Exhaust Temp"
+hard_ceiling_c = 75.0
+curve = [[40, 20], [50, 30], [60, 50], [70, 80]]

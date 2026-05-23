@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-05-22
+
+### Added
+- Per-hardware config templates shipped in
+  `/usr/share/fan-controllerd/configs/`: `r630.toml`, `r730.toml`,
+  `default.toml`. The R630 template uses a 15% floor (verified on
+  hardware); the R730 template keeps the proven 20% floor; the default
+  template ships with prominent "review me" warnings.
+- Install-time hardware detection: postinst calls
+  `dmidecode -s system-product-name` and copies the matching template to
+  `/etc/fan-controllerd/config.toml`. Unrecognized hardware gets the
+  default template and the service is **not** enabled at boot — operator
+  must review and start manually.
+
+### Changed
+- `/etc/fan-controllerd/config.toml` is no longer a dpkg conffile — it is
+  created by the postinst script. On upgrade, an existing config is left
+  untouched (per Debian policy 10.7.3, dpkg keeps the previously-managed
+  conffile in place when a new package version no longer declares it).
+- New dependency: `dmidecode`.
+
 ## [0.1.2] — 2026-05-22
 
 ### Changed

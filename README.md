@@ -94,8 +94,10 @@ with no daemon controlling it:
   loop hangs, systemd kills the process (which triggers the Drop guard).
 - **Heartbeat writes.** Duty re-sent every ~60 s even if unchanged, so the
   BMC can't auto-revert during a long quiet stretch.
-- **Conffile protection.** `/etc/fan-controllerd/config.toml` is marked as a
-  dpkg conffile — your edits survive package upgrades.
+- **Install-time hardware detection.** The `.deb`'s postinst reads
+  `dmidecode -s system-product-name` and seeds `/etc/fan-controllerd/config.toml`
+  from a hardware-tuned template (R630, R730/R730xd, or a conservative
+  default). On upgrade, your existing config is left alone.
 - **Defense in depth.** The package's `prerm` script issues a defensive
   "restore auto" command, in case the daemon was killed before its Drop
   guard could fire (OOM, SIGKILL, etc).
@@ -105,9 +107,28 @@ will revert to auto after its internal timeout in that case.
 
 ## Configuration
 
-`/etc/fan-controllerd/config.toml` ships with sensible defaults for an R730xd
-with dual sockets, 8 NVMe drives, and IPMI exhaust/inlet. Tune the curves
-for your workload:
+The `.deb` ships three reference configs in
+`/usr/share/fan-controllerd/configs/`:
+
+| File | When |
+|---|---|
+| `r630.toml` | Auto-installed on Dell PowerEdge R630 (15% floor, tested) |
+| `r730.toml` | Auto-installed on R730 / R730xd family (20% floor, tested) |
+| `default.toml` | Auto-installed on unrecognized hardware. Service is **not** enabled at boot — review the file first |
+
+Postinst calls `dmidecode -s system-product-name` and copies the matching
+template to `/etc/fan-controllerd/config.toml`. On upgrade, your edited
+config is preserved untouched.
+
+To install one of the other templates manually:
+
+```sh
+sudo cp /usr/share/fan-controllerd/configs/r630.toml /etc/fan-controllerd/config.toml
+sudo fan-controllerd --check
+sudo systemctl restart fan-controllerd
+```
+
+Or tune the live config directly. Key knobs:
 
 ```toml
 tick_seconds = 5
@@ -136,8 +157,8 @@ curve = [[40, 20], [55, 25], [65, 35], [75, 55], [85, 90]]
 # ...
 ```
 
-See [`config/config.toml.example`](config/config.toml.example) for the full
-annotated default config.
+See the per-hardware configs in [`config/`](config/) for the full
+annotated defaults.
 
 ### Curve tuning
 

@@ -1,23 +1,79 @@
 #!/bin/sh
 # postinst — runs after package files are unpacked.
+#
+# On FRESH install (no /etc/fan-controllerd/config.toml present):
+#   - Read `dmidecode -s system-product-name`
+#   - Match against known hardware (R630, R730/R730xd)
+#   - Copy matching config from /usr/share/fan-controllerd/configs/ to /etc/
+#   - Unknown hardware → install default.toml, print warning, skip enable
+# On UPGRADE (config exists): leave it alone.
 set -e
+
+CONFIG_DIR=/etc/fan-controllerd
+CONFIG_FILE=$CONFIG_DIR/config.toml
+CONFIG_SRC_DIR=/usr/share/fan-controllerd/configs
 
 case "$1" in
     configure)
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl daemon-reload || true
-            # Enable on boot but don't start now — operator should review the
-            # config first (sensor names + curves can vary by hardware).
-            systemctl enable fan-controllerd.service >/dev/null 2>&1 || true
+        ENABLE_AT_BOOT=1
+
+        if [ ! -e "$CONFIG_FILE" ]; then
+            # Fresh install — detect hardware and pick a config.
+            PRODUCT=""
+            if command -v dmidecode >/dev/null 2>&1; then
+                PRODUCT=$(dmidecode -s system-product-name 2>/dev/null || true)
+            fi
+
+            case "$PRODUCT" in
+                *R630*)
+                    SRC=$CONFIG_SRC_DIR/r630.toml
+                    HW_LABEL="Dell PowerEdge R630"
+                    ;;
+                *R730*)
+                    # R730 and R730xd share fan topology and BMC behavior.
+                    SRC=$CONFIG_SRC_DIR/r730.toml
+                    HW_LABEL="Dell ${PRODUCT##* }"
+                    ;;
+                *)
+                    SRC=$CONFIG_SRC_DIR/default.toml
+                    HW_LABEL=""
+                    ;;
+            esac
+
+            mkdir -p "$CONFIG_DIR"
+            cp "$SRC" "$CONFIG_FILE"
+            chmod 644 "$CONFIG_FILE"
+
+            if [ -n "$HW_LABEL" ]; then
+                echo "fan-controllerd: detected $HW_LABEL — installed $(basename "$SRC")."
+            else
+                echo >&2
+                echo "================================================================" >&2
+                echo "fan-controllerd: hardware '$PRODUCT' not recognized." >&2
+                echo "Installed conservative default config:" >&2
+                echo "  $CONFIG_FILE" >&2
+                echo "REVIEW it before enabling the service — see comments in the file." >&2
+                echo "Service has NOT been enabled at boot for safety." >&2
+                echo "================================================================" >&2
+                echo >&2
+                ENABLE_AT_BOOT=0
+            fi
         fi
 
-        cat <<'EOF'
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload || true
+            if [ "$ENABLE_AT_BOOT" = "1" ]; then
+                systemctl enable fan-controllerd.service >/dev/null 2>&1 || true
+            fi
+        fi
+
+        cat <<EOF
 
 fan-controllerd installed.
 
-  Review and edit:   /etc/fan-controllerd/config.toml
-  Validate config:   fan-controllerd --check --config /etc/fan-controllerd/config.toml
-  Safe dry-run:      fan-controllerd --dry-run --once --config /etc/fan-controllerd/config.toml
+  Review and edit:   $CONFIG_FILE
+  Validate config:   fan-controllerd --check
+  Safe dry-run:      fan-controllerd --dry-run --once
   Start the daemon:  systemctl start fan-controllerd
   Watch the log:     journalctl -fu fan-controllerd
 
