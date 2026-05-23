@@ -1,0 +1,31 @@
+#!/bin/sh
+# postinst — runs after package files are unpacked.
+set -e
+
+case "$1" in
+    configure)
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload || true
+            # Enable on boot but don't start now — operator should review the
+            # config first (sensor names + curves can vary by hardware).
+            systemctl enable fan-controllerd.service >/dev/null 2>&1 || true
+        fi
+
+        cat <<'EOF'
+
+fan-controllerd installed.
+
+  Review and edit:   /etc/fan-controllerd/config.toml
+  Validate config:   fan-controllerd --check --config /etc/fan-controllerd/config.toml
+  Safe dry-run:      fan-controllerd --dry-run --once --config /etc/fan-controllerd/config.toml
+  Start the daemon:  systemctl start fan-controllerd
+  Watch the log:     journalctl -fu fan-controllerd
+
+EOF
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+exit 0

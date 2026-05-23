@@ -1,0 +1,51 @@
+[package]
+name = "fan-controllerd"
+version = "0.1.0"
+edition = "2021"
+description = "Dynamic fan controller daemon for Dell R630/R730 servers via IPMI"
+license = "MIT"
+authors = ["mcarey <mcarey@solcore.net>"]
+
+[[bin]]
+name = "fan-controllerd"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+signal-hook = "0.3"
+sd-notify = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[package.metadata.deb]
+maintainer = "mcarey <mcarey@solcore.net>"
+copyright = "2026 mcarey"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+fan-controllerd dynamically controls Dell R630/R730 chassis fans via IPMI \
+based on CPU package, NVMe, and IPMI exhaust/inlet temperatures. \
+Uses a piecewise-linear curve per sensor with slew-rate limiting, and \
+restores BMC automatic fan control on any exit as a safety guard."""
+depends = "$auto, ipmitool"
+section = "admin"
+priority = "optional"
+assets = [
+  ["target/release/fan-controllerd", "usr/sbin/", "755"],
+  ["config/config.toml.example", "etc/fan-controllerd/config.toml", "644"],
+  ["systemd/fan-controllerd.service", "lib/systemd/system/", "644"],
+  ["LICENSE", "usr/share/doc/fan-controllerd/", "644"],
+]
+conf-files = ["/etc/fan-controllerd/config.toml"]
+maintainer-scripts = "debian/"

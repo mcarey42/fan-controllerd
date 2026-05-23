@@ -1,0 +1,74 @@
+# fan-controllerd configuration — Dell R730xd defaults
+#
+# How it works:
+#   1. Each tick (default 5s), every sensor's curve is interpolated to a
+#      "demanded duty %".
+#   2. inlet_bias adds a percentage if the inlet temp is hot (room is warm).
+#   3. The MAX demand across all sensors wins ("loudest wins").
+#   4. The slew-rate limiter moves the actual duty toward that target
+#      slowly enough to avoid howling.
+#   5. If any sensor exceeds its `hard_ceiling_c`, the daemon hands control
+#      back to the BMC and exits non-zero (systemd restarts it).
+
+tick_seconds = 5
+write_heartbeat_ticks = 12   # re-send duty every ~60s so BMC doesn't revert
+
+[slew]
+max_rise_per_tick = 10       # ramp up fast on load spike
+max_fall_per_tick = 3        # come down slowly to avoid hunting
+min_duty = 20                # quiet floor — never go below this
+max_duty = 100
+
+[ipmi]
+# Local in-band only — no fields needed.
+
+# Bias all curves upward when the room is hot. A 30C inlet shouldn't be
+# expected to produce a 35C exhaust no matter how hard the fans spin.
+[inlet_bias]
+sensor = "Inlet Temp"
+threshold_c = 27.0
+percent_per_degree_above = 2.0
+max_bias_pct = 30
+
+# ---- CPU package sensors (one per socket) ----
+# Read directly from /sys/class/hwmon (coretemp driver). Fast, no fork.
+
+[[sensor]]
+name = "cpu-pkg-0"
+source = "hwmon"
+chip = "coretemp"
+label = "Package id 0"
+hard_ceiling_c = 90.0
+curve = [[40, 20], [55, 25], [65, 35], [75, 55], [85, 90]]
+
+[[sensor]]
+name = "cpu-pkg-1"
+source = "hwmon"
+chip = "coretemp"
+label = "Package id 1"
+hard_ceiling_c = 90.0
+curve = [[40, 20], [55, 25], [65, 35], [75, 55], [85, 90]]
+
+# ---- NVMe drives ----
+# `label = "Composite"` matches all 8 NVMe hwmons (they each expose a single
+# Composite temperature). The hwmon scanner treats this as 8 logical readings
+# and takes the hottest.
+
+[[sensor]]
+name = "nvme"
+source = "hwmon"
+chip = "nvme"
+label = "Composite"
+hard_ceiling_c = 75.0
+curve = [[45, 20], [60, 30], [70, 60], [74, 90]]
+
+# ---- IPMI exhaust ----
+# Slow-moving "whole-chassis" signal. Catches heat from RAM, PCIe, drives that
+# coretemp/nvme miss.
+
+[[sensor]]
+name = "exhaust"
+source = "ipmi"
+sensor = "Exhaust Temp"
+hard_ceiling_c = 75.0
+curve = [[40, 20], [50, 30], [60, 50], [70, 80]]

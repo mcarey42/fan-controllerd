@@ -1,0 +1,22 @@
+#!/bin/sh
+# prerm — runs before the package is removed or before an upgrade.
+# We stop the service, then defensively re-issue the "restore BMC auto"
+# command in case the daemon couldn't run its Drop guard (e.g. crashed,
+# OOM-killed). This command is idempotent.
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl stop fan-controllerd.service >/dev/null 2>&1 || true
+        fi
+        if command -v ipmitool >/dev/null 2>&1; then
+            ipmitool raw 0x30 0x30 0x01 0x01 >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    failed-upgrade)
+        ;;
+esac
+
+exit 0

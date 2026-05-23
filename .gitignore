@@ -1,0 +1,9 @@
+/target
+Cargo.lock.bak
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local Claude Code workspace settings
+/.claude/

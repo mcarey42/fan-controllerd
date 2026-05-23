@@ -1,0 +1,40 @@
+[Unit]
+Description=Dynamic fan controller daemon for Dell R630/R730 via IPMI
+Documentation=file:///usr/share/doc/fan-controllerd/
+After=multi-user.target
+# We control hardware: don't compete with anything else that might be poking
+# the BMC's fan registers. (Nothing on a stock Proxmox install does.)
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=/usr/sbin/fan-controllerd --config /etc/fan-controllerd/config.toml
+# WatchdogSec must exceed tick_seconds * a comfortable margin. With the
+# default 5s tick we set 30s — if the loop hangs for 30s, systemd kills us
+# (SIGABRT by default) which triggers the BmcGuard's Drop on the unwind path.
+WatchdogSec=30
+TimeoutStartSec=15
+# Give the BmcGuard time to restore auto on SIGTERM (2 attempts * 500ms +
+# slack for the IPMI round-trip). 10s is generous.
+TimeoutStopSec=10
+KillSignal=SIGTERM
+Restart=on-failure
+RestartSec=10
+User=root
+Group=root
+
+# --- hardening (conservative; widen if these block legitimate access) ---
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+# We need rw on /dev/ipmi0 for the BMC and read on /sys/class/hwmon. Both
+# are accessible under default device policy + read access to /sys.
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fan-controllerd
+
+[Install]
+WantedBy=multi-user.target

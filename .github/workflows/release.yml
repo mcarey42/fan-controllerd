@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # needed to create releases + upload artifacts
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-deb:
+    name: Build .deb (${{ matrix.codename }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - codename: bookworm
+            image: debian:bookworm-slim
+          - codename: trixie
+            image: debian:trixie-slim
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install build prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl build-essential pkg-config \
+            dpkg-dev git
+
+      - uses: actions/checkout@v4
+
+      # rustup, not the apt rustc — Debian's is often too old for newer crates.
+      - name: Install Rust stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --default-toolchain stable --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build .deb
+        run: cargo deb
+
+      - name: Rename .deb to include distro codename
+        run: |
+          set -e
+          orig=$(ls target/debian/*.deb | head -1)
+          base=$(basename "$orig" .deb)
+          mv "$orig" "target/debian/${base}+${{ matrix.codename }}.deb"
+          ls -la target/debian/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.codename }}
+          path: target/debian/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: build-deb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # so release notes can include commit log
+
+      - name: Download all .deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: deb-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.deb
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
